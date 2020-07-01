@@ -1,17 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
+<LinearLayout android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:mapbox="http://schemas.android.com/apk/res-auto"
-    tools:context=".MainActivity">
+    android:orientation="vertical"
+    xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:text="Enter Text Here"
+        android:background="@color/textBackground"
+        android:textColor="@color/textColor"
+        />
+
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:text="Dont Enter Text Here"
+        android:background= "@color/textBackground"
+        android:textColor="@color/textColor"
+        />
+    <!--TODO: Add Borders to Edit Text -->
+    <!--TODO: Add Button to switch up and down edit text values -->
+    <!--TODO: Start Navigation Button-->
     <com.mapbox.mapboxsdk.maps.MapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         mapbox:mapbox_cameraTargetLat="42.149683"
         mapbox:mapbox_cameraTargetLng="-119.155770"
-        mapbox:mapbox_cameraZoom="3.853171"/>
+        mapbox:mapbox_cameraZoom="3"
+        />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>
