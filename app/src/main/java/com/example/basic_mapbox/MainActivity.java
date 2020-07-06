@@ -38,7 +38,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private MapboxMap mapboxMap;
     private Location yourLocation;
     private PermissionsManager permissionsManager;
-    private static final int LOCATION_PERMISSION = 99;
     private static final String SOURCE_ID = "SOURCE_ID";
     private static final String ICON_ID = "ICON_ID";
     private static final String LAYER_ID = "LAYER_ID";

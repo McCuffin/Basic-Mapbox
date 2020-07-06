@@ -31,12 +31,24 @@
     <!--TODO: Add Borders to Edit Text -->
     <!--TODO: Add Button to switch up and down edit text values -->
     <!--TODO: Start Navigation Button-->
-
-    <com.mapbox.mapboxsdk.maps.MapView
-        android:id="@+id/mapView"
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        mapbox:mapbox_cameraZoom="12"
-        />
+        android:layout_height="wrap_content">
+
+        <com.mapbox.mapboxsdk.maps.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            mapbox:mapbox_cameraZoom="12" />
+
+        <ImageButton
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:background="@drawable/round_button"
+            android:layout_marginTop="520dp"
+            android:layout_marginRight="20dp"
+            />
+    </RelativeLayout>
 
 </LinearLayout>
