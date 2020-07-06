@@ -3,4 +3,5 @@
     <string name="access_token">pk.eyJ1IjoibWNjdWZmaW4iLCJhIjoiY2tieXZkMjMwMHlkYzJ4bzR6aTJzMzlnZyJ9.sP3tN9f6gepIFj5NSpa_FA</string>
     <string name="user_location_permission_explanation">This app needs location permissions to show its functionality.</string>
     <string name="user_location_permission_title">Need of Location</string>
+    <string name="user_location_permission_not_granted">Location Permission Not Granted</string>
 </resources>

@@ -8,28 +8,35 @@
     <EditText
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:text="Enter Text Here"
         android:background="@color/textBackground"
         android:textColor="@color/textColor"
+        android:hint="Enter Start Point"
+        style="@style/Widget.AppCompat.EditText"
         />
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/textColor"
+        />
     <EditText
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:text="Dont Enter Text Here"
         android:background= "@color/textBackground"
         android:textColor="@color/textColor"
+        android:hint="Enter End Point"
+        style="@style/Widget.AppCompat.EditText"
         />
+
     <!--TODO: Add Borders to Edit Text -->
     <!--TODO: Add Button to switch up and down edit text values -->
     <!--TODO: Start Navigation Button-->
+
     <com.mapbox.mapboxsdk.maps.MapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        mapbox:mapbox_cameraTargetLat="42.149683"
-        mapbox:mapbox_cameraTargetLng="-119.155770"
-        mapbox:mapbox_cameraZoom="3"
+        mapbox:mapbox_cameraZoom="12"
         />
 
 </LinearLayout>
