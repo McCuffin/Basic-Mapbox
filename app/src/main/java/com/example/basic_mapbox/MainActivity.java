@@ -11,6 +11,7 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -43,6 +44,8 @@ import com.mapbox.mapboxsdk.plugins.places.autocomplete.PlaceAutocomplete;
 import com.mapbox.mapboxsdk.plugins.places.autocomplete.model.PlaceOptions;
 import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
 import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
+import com.mapbox.services.android.navigation.ui.v5.NavigationLauncher;
+import com.mapbox.services.android.navigation.ui.v5.NavigationLauncherOptions;
 import com.mapbox.services.android.navigation.ui.v5.route.NavigationMapRoute;
 import com.mapbox.services.android.navigation.v5.navigation.NavigationRoute;
 
@@ -63,10 +66,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private MapView mapView;
     private MapboxMap mapboxMap;
 
-    private DirectionsRoute currentRoute;
+    public static DirectionsRoute currentRoute;
     private NavigationMapRoute navigationMapRoute;
 
-    private Location yourLocation;
+    public static Location yourLocation;
     private Point destinationLocation;
 
     private PermissionsManager permissionsManager;
@@ -84,6 +87,19 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private EditText searchLocation;
 
+    /*NavigationMapboxMap map = navigationView.retrieveNavigationMapboxMap();
+map.updateLocationLayerRenderMode(RenderMode.NORMAL);
+
+    NavigationRoute.Builder builder = NavigationRoute.builder(context)
+.accessToken(MAPBOX_ACCESS_TOKEN)
+.origin(origin)
+.addWaypoint(pickup)
+.destination(destination);
+
+builder.addApproaches("unrestricted", "curb", "curb");
+builder.build();
+
+*/
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -357,6 +373,27 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                                     .zoom(14)
                                     .build()), 4000);
                     generateRoute();
+                    navigationButton = findViewById(R.id.navigation_button);
+                    navigationButton.setEnabled(true);
+                    navigationButton.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
+                            startActivity(intent);
+                            try {
+                                NavigationLauncherOptions options = NavigationLauncherOptions.builder()
+                                        .directionsRoute(currentRoute)
+                                        .shouldSimulateRoute(true)
+                                        .build();
+                                // Call this method with Context from within an Activity
+                                NavigationLauncher.startNavigation(MainActivity.this, options);
+                            }
+                            catch (NullPointerException e)
+                            {
+                                Log.e("Null Pointer Exception", "Current Route is null");
+                            }
+                        }
+                    });
                 }
             }
         }
@@ -397,43 +434,3 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 }
-/*
-
- todo : Earlier mapReady which showed pins
- List<Feature> symbolLayerIconFeatureList = new ArrayList<>();
-        symbolLayerIconFeatureList.add(Feature.fromGeometry(
-                Point.fromLngLat(-57.225365, -33.213144)));
-        symbolLayerIconFeatureList.add(Feature.fromGeometry(
-                Point.fromLngLat(-54.14164, -33.981818)));
-        symbolLayerIconFeatureList.add(Feature.fromGeometry(
-                Point.fromLngLat(-56.990533, -30.583266)));
-
-        mapboxMap.setStyle(new Style.Builder().fromUri("mapbox://styles/mapbox/cjerxnqt3cgvp2rmyuxbeqme7")
-
-// Add the SymbolLayer icon image to the map style
-                .withImage(ICON_ID, BitmapFactory.decodeResource(MainActivity.this.getResources(), R.drawable.mapbox_marker_icon_default))
-
-// Adding a GeoJson source for the SymbolLayer icons.
-                .withSource(new GeoJsonSource(SOURCE_ID,
-                        FeatureCollection.fromFeatures(symbolLayerIconFeatureList)))
-
-// Adding the actual SymbolLayer to the map style. An offset is added that the bottom of the red
-// marker icon gets fixed to the coordinate, rather than the middle of the icon being fixed to
-// the coordinate point. This is offset is not always needed and is dependent on the image
-// that you use for the SymbolLayer icon.
-                .withLayer(new SymbolLayer(LAYER_ID, SOURCE_ID)
-                        .withProperties(
-                                iconImage(ICON_ID),
-                                iconAllowOverlap(true),
-                                iconIgnorePlacement(true)
-                        )
-                ), new Style.OnStyleLoaded() {
-            @Override
-            public void onStyleLoaded(@NonNull Style style) {
-
-// Map is set up and the style has loaded. Now you can add additional data or make other map adjustments.
-            }
-        });
-
-todo :
-*/
