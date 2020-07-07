@@ -10,7 +10,9 @@
         android:layout_height="50dp"
         android:background="@color/textBackground"
         android:textColor="@color/textColor"
-        android:hint="Enter Start Point"
+        android:text="Your Location"
+        android:paddingLeft="5dp"
+        android:enabled="false"
         style="@style/Widget.AppCompat.EditText"
         />
 
@@ -25,6 +27,9 @@
         android:background= "@color/textBackground"
         android:textColor="@color/textColor"
         android:hint="Enter End Point"
+        android:paddingLeft="5dp"
+        android:focusableInTouchMode="false"
+        android:id="@+id/search_location"
         style="@style/Widget.AppCompat.EditText"
         />
 
@@ -48,6 +53,8 @@
             android:background="@drawable/round_button"
             android:layout_marginTop="520dp"
             android:layout_marginRight="20dp"
+            android:id="@+id/navigation_button"
+            android:enabled = "false"
             />
     </RelativeLayout>
 
