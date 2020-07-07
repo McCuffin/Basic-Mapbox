@@ -2,12 +2,15 @@ package com.example.basic_mapbox;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.location.Location;
+import android.location.LocationManager;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -84,11 +87,44 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        locationEnabled();
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_main);
         mapView = findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(this);
+    }
+
+    private void locationEnabled()
+    {
+        LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        boolean gps_enabled = false;
+        boolean network_enabled = false;
+        try
+        {
+            gps_enabled = lm.isProviderEnabled(LocationManager. GPS_PROVIDER ) ;
+        } catch (Exception e) {
+            e.printStackTrace() ;
+        }
+        try {
+            network_enabled = lm.isProviderEnabled(LocationManager. NETWORK_PROVIDER ) ;
+        } catch (Exception e) {
+            e.printStackTrace() ;
+        }
+        if (!gps_enabled && !network_enabled) {
+            new AlertDialog.Builder(MainActivity. this )
+                    .setMessage( "GPS Enable" )
+                    .setPositiveButton( "Settings" , new
+                            DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick (DialogInterface paramDialogInterface , int paramInt) {
+                                    startActivity( new Intent(Settings. ACTION_LOCATION_SOURCE_SETTINGS )) ;
+                                }
+                            })
+                    .setNegativeButton( "Cancel" , null )
+                    .show() ;
+        }
     }
 
     @Override
@@ -206,16 +242,32 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             locationComponent.setLocationComponentEnabled(true);
 //Getting current location of user and adding an icon over there
             yourLocation = locationComponent.getLastKnownLocation();
-            Feature currLocation = Feature.fromGeometry(Point.fromLngLat(yourLocation.getLongitude(),yourLocation.getLatitude()));
-            loadedMapStyle.addImage(ICON_ID, BitmapFactory.decodeResource(MainActivity.this.getResources(), R.drawable.mapbox_marker_icon_default));
-            loadedMapStyle.addSource(new GeoJsonSource(SOURCE_ID, currLocation));
-            loadedMapStyle.addLayer(new SymbolLayer(LAYER_ID, SOURCE_ID)
-            .withProperties(
-                    iconImage(ICON_ID),
-                    iconAllowOverlap(true),
-                    iconIgnorePlacement(true)
-            )
-            );
+            try {
+                Feature currLocation = Feature.fromGeometry(Point.fromLngLat(yourLocation.getLongitude(), yourLocation.getLatitude()));
+                loadedMapStyle.addImage(ICON_ID, BitmapFactory.decodeResource(MainActivity.this.getResources(), R.drawable.mapbox_marker_icon_default));
+                loadedMapStyle.addSource(new GeoJsonSource(SOURCE_ID, currLocation));
+                loadedMapStyle.addLayer(new SymbolLayer(LAYER_ID, SOURCE_ID)
+                        .withProperties(
+                                iconImage(ICON_ID),
+                                iconAllowOverlap(true),
+                                iconIgnorePlacement(true)
+                        )
+                );
+            }
+            catch (NullPointerException e)
+            {
+                AlertDialog.Builder startGPS = new AlertDialog.Builder(this);
+                startGPS.setTitle("GPS not enabled");
+                startGPS.setMessage("In order to use the features of this app, kindly start your GPS");
+                startGPS.setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        //Needed to be left empty since nothing is to be done.
+                    }
+                });
+                AlertDialog permsDialog = startGPS.create();
+                permsDialog.show();
+            }
             // Set the component's camera mode
             locationComponent.setCameraMode(CameraMode.TRACKING);
 
