@@ -64,10 +64,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private MapView mapView;
     private MapboxMap mapboxMap;
 
-    public static DirectionsRoute currentRoute;
+    protected static DirectionsRoute currentRoute;
     private NavigationMapRoute navigationMapRoute;
 
-    public static Location yourLocation;
+    protected static Location yourLocation;
     private Point destinationLocation;
     private Point origin;
     private ArrayList<Point> waypoints = new ArrayList<Point>();
@@ -196,67 +196,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void generateRoute() {
         origin = Point.fromLngLat(yourLocation.getLongitude(), yourLocation.getLatitude());
 
-        NavigationRoute.builder(this)
-                .accessToken(getString(R.string.access_token))
-                .origin(origin)
-                .destination(destinationLocation)
-                .build()
-                .getRoute(new Callback<DirectionsResponse>() {
-                    @Override
-                    public void onResponse(Call<DirectionsResponse> call, Response<DirectionsResponse> response) {
-                        Timber.d("Response code: %s", response.code());
-                        if (response.body() == null) {
-                            Timber.e("No routes found, make sure you set the right user and access token.");
-                            return;
-                        } else if (response.body().routes().size() < 1) {
-                            Timber.e("No routes found");
-                            return;
-                        }
-
-                        currentRoute = response.body().routes().get(0);
-
-                        // Draw the route on the map
-                        if (navigationMapRoute != null) {
-                            navigationMapRoute.removeRoute();
-                        } else {
-                            navigationMapRoute = new NavigationMapRoute(null, mapView, mapboxMap, R.style.NavigationMapRoute);
-                        }
-                        navigationMapRoute.addRoute(currentRoute);
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<DirectionsResponse> call, @NonNull Throwable throwable) {
-                        Timber.e("Error: %s", throwable.getMessage());
-                    }
-                });
-        waypointButton = findViewById(R.id.waypoint_button);
-        waypointButton.setVisibility(View.VISIBLE);
-        waypointButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Intent intent = new PlaceAutocomplete.IntentBuilder()
-                        .accessToken(Mapbox.getAccessToken() != null ? Mapbox.getAccessToken() : getString(R.string.access_token))
-                        .placeOptions(PlaceOptions.builder()
-                                .backgroundColor(Color.parseColor("#EEEEEE"))
-                                .limit(10)
-                                // .addInjectedFeature(home) // For Ease of Location Access
-                                // .addInjectedFeature(work)
-                                .build(PlaceOptions.MODE_CARDS))
-                        .build(MainActivity.this);
-                startActivityForResult(intent, REQUEST_CODE_AUTOCOMPLETE_WAYPOINT);
-            }
-        });
-    }
-
-    private void addWaypoint(ArrayList<Point> waypoints)
-    {
-        //TODO: Route through multiple waypoints correction
         NavigationRoute.Builder routeBuilder = NavigationRoute.builder(this)
                 .accessToken(getString(R.string.access_token))
                 .origin(origin)
                 .destination(destinationLocation);
-        for (int i = 0; i < waypoints.size(); i++)
-            routeBuilder.addWaypoint(waypoints.get(i));
+
+        for (int index = 0; index < waypoints.size(); index++) {
+            routeBuilder.addWaypoint(waypoints.get(index));
+            System.out.println(waypoints.get(index).latitude() + " : " + waypoints.get(index).longitude());
+        }
         NavigationRoute newCurrRoute = routeBuilder.build();
 
         newCurrRoute.getRoute(new Callback<DirectionsResponse>() {
@@ -287,17 +235,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Timber.e("Error: %s", throwable.getMessage());
             }
         });
-
-
-        // Draw the route on the map
-        if (navigationMapRoute != null) {
-            navigationMapRoute.removeRoute();
-        } else {
-            navigationMapRoute = new NavigationMapRoute(null, mapView, mapboxMap, R.style.NavigationMapRoute);
-        }
-        navigationMapRoute.addRoute(currentRoute);
     }
-
 
     @SuppressWarnings( {"MissingPermission"})
     private void enableLocationComponent(@NonNull Style loadedMapStyle) {
@@ -436,6 +374,32 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     generateRoute();
                 }
             }
+            navigationButton = findViewById(R.id.navigation_button);
+            navigationButton.setEnabled(true);
+            navigationButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
+                    startActivity(intent);
+                }
+            });
+            waypointButton = findViewById(R.id.waypoint_button);
+            waypointButton.setVisibility(View.VISIBLE);
+            waypointButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    Intent intent = new PlaceAutocomplete.IntentBuilder()
+                            .accessToken(Mapbox.getAccessToken() != null ? Mapbox.getAccessToken() : getString(R.string.access_token))
+                            .placeOptions(PlaceOptions.builder()
+                                    .backgroundColor(Color.parseColor("#EEEEEE"))
+                                    .limit(10)
+                                    // .addInjectedFeature(home) // For Ease of Location Access
+                                    // .addInjectedFeature(work)
+                                    .build(PlaceOptions.MODE_CARDS))
+                            .build(MainActivity.this);
+                    startActivityForResult(intent, REQUEST_CODE_AUTOCOMPLETE_WAYPOINT);
+                }
+            });
         }
         else if (resultCode == Activity.RESULT_OK && requestCode == REQUEST_CODE_AUTOCOMPLETE_WAYPOINT) {
             CarmenFeature selectedCarmenFeature = PlaceAutocomplete.getPlace(data);
@@ -457,19 +421,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                                             destinationLocation.longitude()))
                                     .zoom(11.5)
                                     .build()), 4000);
-                    addWaypoint(waypoints);
+                    generateRoute();
                 }
             }
         }
-        navigationButton = findViewById(R.id.navigation_button);
-        navigationButton.setEnabled(true);
-        navigationButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
-                startActivity(intent);
-            }
-        });
     }
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -506,4 +461,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             finish();
         }
     }
+
+
 }

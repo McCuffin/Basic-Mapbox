@@ -213,7 +213,9 @@ public class NavigationActivity extends AppCompatActivity implements OnNavigatio
 
     @Override
     public SpeechAnnouncement willVoice(SpeechAnnouncement announcement) {
-        return null;
+        return announcement.toBuilder()
+                .announcement("All Instructions are same")
+                .build();
     }
 }
 
