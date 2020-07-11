@@ -11,6 +11,7 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -21,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.mapbox.android.core.permissions.PermissionsListener;
 import com.mapbox.android.core.permissions.PermissionsManager;
+import com.mapbox.api.directions.v5.DirectionsCriteria;
 import com.mapbox.api.directions.v5.models.DirectionsResponse;
 import com.mapbox.api.directions.v5.models.DirectionsRoute;
 import com.mapbox.api.geocoding.v5.models.CarmenFeature;
@@ -46,7 +48,11 @@ import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
 import com.mapbox.services.android.navigation.ui.v5.route.NavigationMapRoute;
 import com.mapbox.services.android.navigation.v5.navigation.NavigationRoute;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 
 import retrofit2.Call;
@@ -70,8 +76,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected static Location yourLocation;
     private Point destinationLocation;
     private Point origin;
-    private ArrayList<Point> waypoints = new ArrayList<Point>();
-    private ArrayList<Feature> features = new ArrayList<Feature>();
+    private ArrayList<Point> waypoints = new ArrayList<>();
+    private ArrayList<Feature> features = new ArrayList<>();
+    private static final String TAG = "MainActivity";
 
     private PermissionsManager permissionsManager;
 
@@ -100,40 +107,38 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mapView.getMapAsync(this);
     }
 
-    private void locationEnabled()
-    {
+    private void locationEnabled() {
         //TODO: Have to start the GPS
         LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         boolean gps_enabled = false;
         boolean network_enabled = false;
-        try
-        {
-            gps_enabled = lm.isProviderEnabled(LocationManager. GPS_PROVIDER ) ;
+        try {
+            gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
         } catch (Exception e) {
-            e.printStackTrace() ;
+            e.printStackTrace();
         }
         try {
-            network_enabled = lm.isProviderEnabled(LocationManager. NETWORK_PROVIDER ) ;
+            network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
         } catch (Exception e) {
-            e.printStackTrace() ;
+            e.printStackTrace();
         }
         if (!gps_enabled && !network_enabled) {
-            new AlertDialog.Builder(MainActivity.this )
-                    .setMessage( "GPS Enable" )
-                    .setPositiveButton( "Settings" , new
+            new AlertDialog.Builder(MainActivity.this)
+                    .setMessage("GPS Enable")
+                    .setPositiveButton("Settings", new
                             DialogInterface.OnClickListener() {
                                 @Override
-                                public void onClick (DialogInterface paramDialogInterface , int paramInt) {
-                                    startActivity( new Intent(Settings. ACTION_LOCATION_SOURCE_SETTINGS )) ;
+                                public void onClick(DialogInterface paramDialogInterface, int paramInt) {
+                                    startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
                                 }
                             })
-                    .setNegativeButton( "Cancel" , null )
-                    .show() ;
+                    .setNegativeButton("Cancel", null)
+                    .show();
         }
     }
 
     @Override
-    @SuppressWarnings( {"MissingPermission"})
+    @SuppressWarnings({"MissingPermission"})
     public void onStart() {
         super.onStart();
         mapView.onStart();
@@ -199,17 +204,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         NavigationRoute.Builder routeBuilder = NavigationRoute.builder(this)
                 .accessToken(getString(R.string.access_token))
                 .origin(origin)
+                .profile(DirectionsCriteria.PROFILE_DRIVING)
                 .destination(destinationLocation);
 
-        for (int index = 0; index < waypoints.size(); index++) {
-            routeBuilder.addWaypoint(waypoints.get(index));
-            System.out.println(waypoints.get(index).latitude() + " : " + waypoints.get(index).longitude());
+        Log.d(TAG, "generateRoute: Total Waypoints : "+waypoints.size());
+        for(Point p:waypoints){
+            routeBuilder.addWaypoint(p);
+            Log.d(TAG, "generateRoute: "+p.latitude()+" , "+p.longitude());
         }
         NavigationRoute newCurrRoute = routeBuilder.build();
 
         newCurrRoute.getRoute(new Callback<DirectionsResponse>() {
             @Override
             public void onResponse(Call<DirectionsResponse> call, Response<DirectionsResponse> response) {
+                Log.d(TAG, "onResponse: "+response);
                 Timber.d("Response code: %s", response.code());
                 if (response.body() == null) {
                     Timber.e("No routes found, make sure you set the right user and access token.");
@@ -237,7 +245,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
-    @SuppressWarnings( {"MissingPermission"})
+    @SuppressWarnings({"MissingPermission"})
     private void enableLocationComponent(@NonNull Style loadedMapStyle) {
 // Check if permissions are enabled and if not request
         if (PermissionsManager.areLocationPermissionsGranted(this)) {
@@ -264,9 +272,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                                 iconIgnorePlacement(true)
                         )
                 );
-            }
-            catch (NullPointerException e)
-            {
+            } catch (NullPointerException e) {
                 AlertDialog.Builder startGPS = new AlertDialog.Builder(this);
                 startGPS.setTitle("GPS not enabled");
                 startGPS.setMessage("In order to use the features of this app, kindly start your GPS");
@@ -290,42 +296,43 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    private void initSearchFab()
-    {
+    private void initSearchFab() {
         searchLocation = findViewById(R.id.search_location);
         searchLocation.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Intent intent = new PlaceAutocomplete.IntentBuilder()
-                            .accessToken(Mapbox.getAccessToken() != null ? Mapbox.getAccessToken() : getString(R.string.access_token))
-                            .placeOptions(PlaceOptions.builder()
-                                    .backgroundColor(Color.parseColor("#EEEEEE"))
-                                    .limit(10)
-                                   // .addInjectedFeature(home) // For Ease of Location Access
-                                   // .addInjectedFeature(work)
-                                    .build(PlaceOptions.MODE_CARDS))
-                            .build(MainActivity.this);
-                    startActivityForResult(intent, REQUEST_CODE_AUTOCOMPLETE);
-                }
-            });
+                        .accessToken(Mapbox.getAccessToken() != null ? Mapbox.getAccessToken() : getString(R.string.access_token))
+                        .placeOptions(PlaceOptions.builder()
+                                .backgroundColor(Color.parseColor("#EEEEEE"))
+                                .limit(10)
+                                // .addInjectedFeature(home) // For Ease of Location Access
+                                // .addInjectedFeature(work)
+                                .build(PlaceOptions.MODE_CARDS))
+                        .build(MainActivity.this);
+                startActivityForResult(intent, REQUEST_CODE_AUTOCOMPLETE);
+            }
+        });
     }
+
     /**
      * Not to be worked on right now
-    private void addUserLocations() {
-        home = CarmenFeature.builder().text("Mapbox SF Office")
-                .geometry(Point.fromLngLat(-122.3964485, 37.7912561))
-                .placeName("50 Beale St, San Francisco, CA")
-                .id("mapbox-sf")
-                .properties(new JsonObject())
-                .build();
-
-        work = CarmenFeature.builder().text("Mapbox DC Office")
-                .placeName("740 15th Street NW, Washington DC")
-                .geometry(Point.fromLngLat(-77.0338348, 38.899750))
-                .id("mapbox-dc")
-                .properties(new JsonObject())
-                .build();
-    } */
+     * private void addUserLocations() {
+     * home = CarmenFeature.builder().text("Mapbox SF Office")
+     * .geometry(Point.fromLngLat(-122.3964485, 37.7912561))
+     * .placeName("50 Beale St, San Francisco, CA")
+     * .id("mapbox-sf")
+     * .properties(new JsonObject())
+     * .build();
+     * <p>
+     * work = CarmenFeature.builder().text("Mapbox DC Office")
+     * .placeName("740 15th Street NW, Washington DC")
+     * .geometry(Point.fromLngLat(-77.0338348, 38.899750))
+     * .id("mapbox-dc")
+     * .properties(new JsonObject())
+     * .build();
+     * }
+     */
 
     private void setUpSource(@NonNull Style loadedMapStyle) {
         loadedMapStyle.addSource(new GeoJsonSource(geojsonSourceLayerId));
@@ -334,7 +341,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void setupLayer(@NonNull Style loadedMapStyle) {
         loadedMapStyle.addLayer(new SymbolLayer("SYMBOL_LAYER_ID", geojsonSourceLayerId).withProperties(
                 iconImage(ICON_ID),
-                iconOffset(new Float[] {0f, -8f})
+                iconOffset(new Float[]{0f, -8f})
         ));
     }
 
@@ -345,7 +352,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 // Retrieve selected location's CarmenFeature
             CarmenFeature selectedCarmenFeature = PlaceAutocomplete.getPlace(data);
-            destinationLocation = (Point)selectedCarmenFeature.geometry(); //Gives destination Location
+            destinationLocation = (Point) selectedCarmenFeature.geometry(); //Gives destination Location
 
 //Changing Edit Text to the destination location name
             searchLocation.setText(selectedCarmenFeature.placeName().substring(0, selectedCarmenFeature.placeName().indexOf(',')));
@@ -400,10 +407,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     startActivityForResult(intent, REQUEST_CODE_AUTOCOMPLETE_WAYPOINT);
                 }
             });
-        }
-        else if (resultCode == Activity.RESULT_OK && requestCode == REQUEST_CODE_AUTOCOMPLETE_WAYPOINT) {
+        } else if (resultCode == Activity.RESULT_OK && requestCode == REQUEST_CODE_AUTOCOMPLETE_WAYPOINT) {
             CarmenFeature selectedCarmenFeature = PlaceAutocomplete.getPlace(data);
-            waypoints.add((Point) selectedCarmenFeature.geometry());
+            if(!waypoints.contains(selectedCarmenFeature.geometry()))
+                waypoints.add((Point) selectedCarmenFeature.geometry());
             features.add(Feature.fromJson(selectedCarmenFeature.toJson()));
 
 
@@ -426,6 +433,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         }
     }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         permissionsManager.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -455,8 +463,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     enableLocationComponent(style);
                 }
             });
-        }
-        else {
+        } else {
             Toast.makeText(this, R.string.user_location_permission_not_granted, Toast.LENGTH_LONG).show();
             finish();
         }
