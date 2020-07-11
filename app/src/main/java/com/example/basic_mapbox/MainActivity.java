@@ -20,6 +20,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.gson.JsonObject;
 import com.mapbox.android.core.permissions.PermissionsListener;
 import com.mapbox.android.core.permissions.PermissionsManager;
 import com.mapbox.api.directions.v5.DirectionsCriteria;
@@ -48,17 +49,13 @@ import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
 import com.mapbox.services.android.navigation.ui.v5.route.NavigationMapRoute;
 import com.mapbox.services.android.navigation.v5.navigation.NavigationRoute;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
-import timber.log.Timber;
 
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconAllowOverlap;
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconIgnorePlacement;
@@ -74,11 +71,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private NavigationMapRoute navigationMapRoute;
 
     protected static Location yourLocation;
-    private Point destinationLocation;
+    protected static Point destinationLocation;
     private Point origin;
-    private ArrayList<Point> waypoints = new ArrayList<>();
-    private ArrayList<Feature> features = new ArrayList<>();
+    protected static ArrayList<Point> waypoints = new ArrayList<>();
+    private ArrayList<Feature> featuresList = new ArrayList<>();
+    private HashMap<String, Feature> features = new HashMap<>();
     private static final String TAG = "MainActivity";
+    private static final boolean ON_CLICK_CALL_ORIGIN = true;
+    private static final boolean ON_CLICK_CALL_DESTINATION = false;
 
     private PermissionsManager permissionsManager;
 
@@ -89,13 +89,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private ImageButton navigationButton;
     private ImageButton waypointButton;
 
-    private static final int REQUEST_CODE_AUTOCOMPLETE = 1;
+    private static final int REQUEST_CODE_AUTOCOMPLETE_ORIGIN = 0;
+    private static final int REQUEST_CODE_AUTOCOMPLETE_DESTINATION = 1;
     private static final int REQUEST_CODE_AUTOCOMPLETE_WAYPOINT = 2;
-    //private CarmenFeature home;
-    //private CarmenFeature work;
+    private static final String hashMapKeyOrigin = "Origin";
+    private static final String hashMapKeyDestination = "Destination";
+    private CarmenFeature currUserLocation;
     private String geojsonSourceLayerId = "geojsonSourceLayerId";
 
     private EditText searchLocation;
+    private EditText originLocation;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -103,6 +106,34 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_main);
         mapView = findViewById(R.id.mapView);
+        navigationButton = findViewById(R.id.navigation_button);
+        navigationButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (navigationButton.isEnabled()) {
+                    Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
+                    startActivity(intent);
+                }
+                else {
+                    AlertDialog.Builder setDestination = new AlertDialog.Builder(MainActivity.this);
+                    setDestination.setTitle("Destination Not Provided");
+                    setDestination.setMessage("Please provide a destination in order to navigate");
+                    setDestination.setNeutralButton("OK", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            //Intentionally left empty since nothing is to be done.
+                        }
+                    });
+                    AlertDialog setDestinationDialog = setDestination.create();
+                    setDestinationDialog.show();
+                }
+            }
+        });
+        waypointButton = findViewById(R.id.waypoint_button);
+        searchLocation = findViewById(R.id.search_location);
+        originLocation = findViewById(R.id.origin_location);
+
+
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(this);
     }
@@ -183,15 +214,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     public void onMapReady(@NonNull final MapboxMap mapboxMap) {
         MainActivity.this.mapboxMap = mapboxMap;
-
         mapboxMap.setStyle(new Style.Builder().fromUri("mapbox://styles/mapbox/streets-v11"),
                 new Style.OnStyleLoaded() {
                     @Override
                     public void onStyleLoaded(@NonNull Style style) {
                         enableLocationComponent(style);
 
-                        initSearchFab();
-                        //addUserLocations();
+                        initSearchLocation();
+                        addUserLocations();
                         setUpSource(style);
                         setupLayer(style);
                     }
@@ -199,31 +229,29 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void generateRoute() {
-        origin = Point.fromLngLat(yourLocation.getLongitude(), yourLocation.getLatitude());
-
         NavigationRoute.Builder routeBuilder = NavigationRoute.builder(this)
                 .accessToken(getString(R.string.access_token))
                 .origin(origin)
                 .profile(DirectionsCriteria.PROFILE_DRIVING)
                 .destination(destinationLocation);
 
-        Log.d(TAG, "generateRoute: Total Waypoints : "+waypoints.size());
+        Log.d(TAG, "generateRoute: Total Waypoints : "+ waypoints.size());
         for(Point p:waypoints){
             routeBuilder.addWaypoint(p);
-            Log.d(TAG, "generateRoute: "+p.latitude()+" , "+p.longitude());
+            Log.d(TAG, "generateRoute: "+ p.latitude()+" , "+ p.longitude());
         }
         NavigationRoute newCurrRoute = routeBuilder.build();
 
         newCurrRoute.getRoute(new Callback<DirectionsResponse>() {
             @Override
             public void onResponse(Call<DirectionsResponse> call, Response<DirectionsResponse> response) {
-                Log.d(TAG, "onResponse: "+response);
-                Timber.d("Response code: %s", response.code());
+                Log.d(TAG, "onResponse: "+ response);
+                Log.d(TAG, "Response code: "+ response.code());
                 if (response.body() == null) {
-                    Timber.e("No routes found, make sure you set the right user and access token.");
+                    Log.e(TAG, "No routes found, make sure you set the right user and access token.");
                     return;
                 } else if (response.body().routes().size() < 1) {
-                    Timber.e("No routes found");
+                    Log.e(TAG,"No routes found");
                     return;
                 }
 
@@ -240,7 +268,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             @Override
             public void onFailure(@NonNull Call<DirectionsResponse> call, @NonNull Throwable throwable) {
-                Timber.e("Error: %s", throwable.getMessage());
+                Log.e(TAG, "Error: " + throwable.getMessage());
             }
         });
     }
@@ -261,10 +289,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             locationComponent.setLocationComponentEnabled(true);
 //Getting current location of user and adding an icon over there
             yourLocation = locationComponent.getLastKnownLocation();
+            origin = Point.fromLngLat(yourLocation.getLongitude(), yourLocation.getLatitude());
+
             try {
-                Feature currLocation = Feature.fromGeometry(Point.fromLngLat(yourLocation.getLongitude(), yourLocation.getLatitude()));
+                features.put(hashMapKeyOrigin, Feature.fromGeometry(origin));
+                featuresList.add(Feature.fromGeometry(origin));
+
                 loadedMapStyle.addImage(ICON_ID, BitmapFactory.decodeResource(MainActivity.this.getResources(), R.drawable.mapbox_marker_icon_default));
-                loadedMapStyle.addSource(new GeoJsonSource(SOURCE_ID, currLocation));
+                loadedMapStyle.addSource(new GeoJsonSource(SOURCE_ID));
                 loadedMapStyle.addLayer(new SymbolLayer(LAYER_ID, SOURCE_ID)
                         .withProperties(
                                 iconImage(ICON_ID),
@@ -296,43 +328,53 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-    private void initSearchFab() {
-        searchLocation = findViewById(R.id.search_location);
+    private void initSearchLocation() {
+        originLocation.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                onClickListenerEditText(ON_CLICK_CALL_ORIGIN);
+            }
+        });
         searchLocation.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent intent = new PlaceAutocomplete.IntentBuilder()
-                        .accessToken(Mapbox.getAccessToken() != null ? Mapbox.getAccessToken() : getString(R.string.access_token))
-                        .placeOptions(PlaceOptions.builder()
-                                .backgroundColor(Color.parseColor("#EEEEEE"))
-                                .limit(10)
-                                // .addInjectedFeature(home) // For Ease of Location Access
-                                // .addInjectedFeature(work)
-                                .build(PlaceOptions.MODE_CARDS))
-                        .build(MainActivity.this);
-                startActivityForResult(intent, REQUEST_CODE_AUTOCOMPLETE);
+                onClickListenerEditText(ON_CLICK_CALL_DESTINATION);
             }
         });
     }
 
-    /**
-     * Not to be worked on right now
-     * private void addUserLocations() {
-     * home = CarmenFeature.builder().text("Mapbox SF Office")
-     * .geometry(Point.fromLngLat(-122.3964485, 37.7912561))
-     * .placeName("50 Beale St, San Francisco, CA")
-     * .id("mapbox-sf")
-     * .properties(new JsonObject())
-     * .build();
-     * <p>
-     * work = CarmenFeature.builder().text("Mapbox DC Office")
-     * .placeName("740 15th Street NW, Washington DC")
-     * .geometry(Point.fromLngLat(-77.0338348, 38.899750))
-     * .id("mapbox-dc")
-     * .properties(new JsonObject())
-     * .build();
-     * }
-     */
+    private void onClickListenerEditText(final boolean ON_CLICK_CALL) {
+        if (ON_CLICK_CALL) {
+            Intent intent = new PlaceAutocomplete.IntentBuilder()
+                    .accessToken(Mapbox.getAccessToken() != null ? Mapbox.getAccessToken() : getString(R.string.access_token))
+                    .placeOptions(PlaceOptions.builder()
+                            .backgroundColor(Color.parseColor("#EEEEEE"))
+                            .limit(10)
+                            .addInjectedFeature(currUserLocation) // For Ease of Location Access
+                            .build(PlaceOptions.MODE_CARDS))
+                    .build(MainActivity.this);
+            startActivityForResult(intent, REQUEST_CODE_AUTOCOMPLETE_ORIGIN);
+        } else {
+            Intent intent = new PlaceAutocomplete.IntentBuilder()
+                    .accessToken(Mapbox.getAccessToken() != null ? Mapbox.getAccessToken() : getString(R.string.access_token))
+                    .placeOptions(PlaceOptions.builder()
+                            .backgroundColor(Color.parseColor("#EEEEEE"))
+                            .limit(10)
+                            .build(PlaceOptions.MODE_CARDS))
+                    .build(MainActivity.this);
+            startActivityForResult(intent, REQUEST_CODE_AUTOCOMPLETE_DESTINATION);
+        }
+    }
+
+      private void addUserLocations() {
+          currUserLocation = CarmenFeature.builder().text("Your Location")
+                  .geometry(Point.fromLngLat(yourLocation.getLongitude(), yourLocation.getLatitude()))
+                  .placeName("Your Location,")
+                  .id("user-location")
+                  .properties(new JsonObject())
+                  .build();
+     }
+
 
     private void setUpSource(@NonNull Style loadedMapStyle) {
         loadedMapStyle.addSource(new GeoJsonSource(geojsonSourceLayerId));
@@ -345,52 +387,95 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         ));
     }
 
+    private void placeSelector(Intent data, int requestCode) {
+// Retrieve selected location's CarmenFeature
+        CarmenFeature selectedCarmenFeature = PlaceAutocomplete.getPlace(data);
+
+        if (requestCode == REQUEST_CODE_AUTOCOMPLETE_ORIGIN) {
+            origin = (Point) selectedCarmenFeature.geometry();
+            originLocation.setText(selectedCarmenFeature.placeName().substring(0, selectedCarmenFeature.placeName().indexOf(',')));
+
+            Feature temp = features.get(hashMapKeyDestination);
+
+            if (features.size() != 0) {
+                features.clear();
+                featuresList.clear();
+                waypoints.clear();
+            }
+            features.put(hashMapKeyOrigin, Feature.fromJson(selectedCarmenFeature.toJson()));
+            if (temp != null) {
+                features.put(hashMapKeyDestination, temp);
+                featuresList.add(temp);
+            }
+        }
+        else if (requestCode == REQUEST_CODE_AUTOCOMPLETE_DESTINATION) {
+            destinationLocation = (Point) selectedCarmenFeature.geometry(); //Gives destination Location
+//Changing Edit Text to the destination location name
+            searchLocation.setText(selectedCarmenFeature.placeName().substring(0, selectedCarmenFeature.placeName().indexOf(',')));
+
+            Feature temp = features.get(hashMapKeyOrigin);
+
+            if (features.size() != 0) {
+                features.clear();
+                featuresList.clear();
+                waypoints.clear();
+            }
+            features.put(hashMapKeyDestination, Feature.fromJson(selectedCarmenFeature.toJson()));
+            if (temp != null) {
+                features.put(hashMapKeyOrigin, temp);
+                featuresList.add(temp);
+            }
+        }
+        else {
+            if(!waypoints.contains(selectedCarmenFeature.geometry())) {
+                waypoints.add((Point) selectedCarmenFeature.geometry());
+                featuresList.add(Feature.fromJson(selectedCarmenFeature.toJson()));
+            }
+        }
+
+        featuresList.add(Feature.fromJson(selectedCarmenFeature.toJson()));
+
+
+// Create a new FeatureCollection and add a new Feature to it using selectedCarmenFeature above.
+// Then retrieve and update the source designated for showing a selected location's symbol layer icon
+
+        if (mapboxMap != null) {
+            Style style = mapboxMap.getStyle();
+            if (style != null) {
+                GeoJsonSource source = style.getSourceAs(geojsonSourceLayerId);
+                if (source != null) {
+                    source.setGeoJson(FeatureCollection.fromFeatures(featuresList));
+                }
+                float zoom = 14f;
+                Point animateCameraTo = destinationLocation;
+                if (requestCode == REQUEST_CODE_AUTOCOMPLETE_ORIGIN)
+                    animateCameraTo = origin;
+                else if (requestCode == REQUEST_CODE_AUTOCOMPLETE_WAYPOINT)
+                    zoom = 11.5f;
+
+// Move map camera to the selected location
+                mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(
+                        new CameraPosition.Builder()
+                                .target(new LatLng(animateCameraTo.latitude(),
+                                        animateCameraTo.longitude()))
+                                .zoom(zoom)
+                                .build()), 4000);
+                if (features.get(hashMapKeyDestination) != null)
+                    generateRoute();
+            }
+        }
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == Activity.RESULT_OK && requestCode == REQUEST_CODE_AUTOCOMPLETE) {
-
-// Retrieve selected location's CarmenFeature
-            CarmenFeature selectedCarmenFeature = PlaceAutocomplete.getPlace(data);
-            destinationLocation = (Point) selectedCarmenFeature.geometry(); //Gives destination Location
-
-//Changing Edit Text to the destination location name
-            searchLocation.setText(selectedCarmenFeature.placeName().substring(0, selectedCarmenFeature.placeName().indexOf(',')));
-// Create a new FeatureCollection and add a new Feature to it using selectedCarmenFeature above.
-// Then retrieve and update the source designated for showing a selected location's symbol layer icon
-            if (features.size() != 0)
-                features.clear();
-
-            features.add(Feature.fromJson(selectedCarmenFeature.toJson()));
-
-            if (mapboxMap != null) {
-                Style style = mapboxMap.getStyle();
-                if (style != null) {
-                    GeoJsonSource source = style.getSourceAs(geojsonSourceLayerId);
-                    if (source != null) {
-                        source.setGeoJson(FeatureCollection.fromFeatures(features));
-                    }
-
-// Move map camera to the selected location
-                    mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(
-                            new CameraPosition.Builder()
-                                    .target(new LatLng(destinationLocation.latitude(),
-                                            destinationLocation.longitude()))
-                                    .zoom(14)
-                                    .build()), 4000);
-                    generateRoute();
-                }
-            }
-            navigationButton = findViewById(R.id.navigation_button);
+        if(resultCode == Activity.RESULT_OK && requestCode == REQUEST_CODE_AUTOCOMPLETE_ORIGIN){
+            placeSelector(data, requestCode);
+        }
+        else if(resultCode == Activity.RESULT_OK && requestCode == REQUEST_CODE_AUTOCOMPLETE_DESTINATION) {
+            placeSelector(data, requestCode);
             navigationButton.setEnabled(true);
-            navigationButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
-                    startActivity(intent);
-                }
-            });
-            waypointButton = findViewById(R.id.waypoint_button);
+
             waypointButton.setVisibility(View.VISIBLE);
             waypointButton.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -408,29 +493,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 }
             });
         } else if (resultCode == Activity.RESULT_OK && requestCode == REQUEST_CODE_AUTOCOMPLETE_WAYPOINT) {
-            CarmenFeature selectedCarmenFeature = PlaceAutocomplete.getPlace(data);
-            if(!waypoints.contains(selectedCarmenFeature.geometry()))
-                waypoints.add((Point) selectedCarmenFeature.geometry());
-            features.add(Feature.fromJson(selectedCarmenFeature.toJson()));
-
-
-            if (mapboxMap != null) {
-                Style style = mapboxMap.getStyle();
-                if (style != null) {
-                    GeoJsonSource source = style.getSourceAs(geojsonSourceLayerId);
-                    if (source != null) {
-                        source.setGeoJson(FeatureCollection.fromFeatures(features));
-                    }
-
-                    mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(
-                            new CameraPosition.Builder()
-                                    .target(new LatLng(destinationLocation.latitude(),
-                                            destinationLocation.longitude()))
-                                    .zoom(11.5)
-                                    .build()), 4000);
-                    generateRoute();
-                }
-            }
+            placeSelector(data, requestCode);
         }
     }
 
@@ -468,6 +531,4 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             finish();
         }
     }
-
-
 }

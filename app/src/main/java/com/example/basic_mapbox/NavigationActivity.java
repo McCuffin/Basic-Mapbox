@@ -1,20 +1,29 @@
 package com.example.basic_mapbox;
 
+import android.content.DialogInterface;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.IdRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.mapbox.api.directions.v5.DirectionsCriteria;
 import com.mapbox.api.directions.v5.models.BannerInstructions;
+import com.mapbox.api.directions.v5.models.DirectionsResponse;
 import com.mapbox.api.directions.v5.models.DirectionsRoute;
+import com.mapbox.geojson.Point;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.services.android.navigation.ui.v5.NavigationView;
@@ -23,20 +32,33 @@ import com.mapbox.services.android.navigation.ui.v5.OnNavigationReadyCallback;
 import com.mapbox.services.android.navigation.ui.v5.listeners.BannerInstructionsListener;
 import com.mapbox.services.android.navigation.ui.v5.listeners.InstructionListListener;
 import com.mapbox.services.android.navigation.ui.v5.listeners.NavigationListener;
+import com.mapbox.services.android.navigation.ui.v5.listeners.RouteListener;
 import com.mapbox.services.android.navigation.ui.v5.listeners.SpeechAnnouncementListener;
 import com.mapbox.services.android.navigation.ui.v5.voice.SpeechAnnouncement;
+import com.mapbox.services.android.navigation.v5.navigation.NavigationRoute;
+import com.mapbox.services.android.navigation.v5.offroute.OffRouteListener;
+import com.mapbox.services.android.navigation.v5.route.FasterRouteListener;
 import com.mapbox.services.android.navigation.v5.routeprogress.ProgressChangeListener;
 import com.mapbox.services.android.navigation.v5.routeprogress.RouteProgress;
 
+import java.io.IOException;
+import java.util.List;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
 public class NavigationActivity extends AppCompatActivity implements OnNavigationReadyCallback,
         NavigationListener, ProgressChangeListener, InstructionListListener, SpeechAnnouncementListener,
-        BannerInstructionsListener {
+        BannerInstructionsListener, RouteListener, OffRouteListener, FasterRouteListener {
 
     private static final int INITIAL_ZOOM = 16;
+    private final String TAG = "NavigationActivity";
 
     private NavigationView navigationView;
     private View spacer;
     private TextView speedWidget;
+    private DirectionsRoute newCurrentRoute;
 
     private boolean bottomSheetVisible = true;
 
@@ -217,6 +239,97 @@ public class NavigationActivity extends AppCompatActivity implements OnNavigatio
                 .announcement("All Instructions are same")
                 .build();
     }
-}
 
-//TODO: Have to remove the unnecessary simulation at start of navigation
+    @Override
+    public boolean allowRerouteFrom(Point offRoutePoint) {
+        return true;
+    }
+
+    @Override
+    public void onOffRoute(Point offRoutePoint) {
+
+    }
+
+    @Override
+    public void onRerouteAlong(DirectionsRoute directionsRoute) {
+
+    }
+
+    @Override
+    public void onFailedReroute(String errorMessage) {
+        new AlertDialog.Builder(this)
+                .setTitle("Unable to find route")
+                .setMessage(errorMessage)
+                .setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        //Intentionally left empty since nothing is to be done.
+                    }
+                })
+                .create()
+                .show();
+    }
+
+    @Override
+    public void onArrival() {
+        if (!MainActivity.waypoints.isEmpty()) {
+            Point currWaypoint = MainActivity.waypoints.remove(0);
+            Geocoder converter = new Geocoder(this);
+            String location = "";
+            try {
+                List<Address> address = converter.getFromLocation(currWaypoint.latitude(), currWaypoint.longitude(), 1);
+                if (address != null && address.size() > 0) {
+                    location = address.get(0).getAddressLine(0);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            Toast.makeText(this, "You have arrived at " + location, Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "You have reached your destination", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    public void userOffRoute(Location location) {
+        NavigationRoute.Builder routeBuilder = NavigationRoute.builder(this)
+                .accessToken(getString(R.string.access_token))
+                .profile(DirectionsCriteria.PROFILE_DRIVING)
+                .origin(Point.fromLngLat(location.getLongitude(), location.getLatitude()))
+                .destination(MainActivity.destinationLocation);
+
+        for(Point p: MainActivity.waypoints) {
+            routeBuilder.addWaypoint(p);
+        }
+
+        NavigationRoute newRoute = routeBuilder.build();
+        newRoute.getRoute(new Callback<DirectionsResponse>() {
+            @Override
+            public void onResponse(Call<DirectionsResponse> call, Response<DirectionsResponse> response) {
+                Log.d(TAG, "onResponse: "+ response);
+                Log.d(TAG, "Response code: "+ response.code());
+                if (response.body() == null) {
+                    Log.e(TAG, "No routes found, make sure you set the right user and access token.");
+                    return;
+                } else if (response.body().routes().size() < 1) {
+                    Log.e(TAG,"No routes found");
+                    return;
+                }
+
+                newCurrentRoute = response.body().routes().get(0);
+                startNavigation(newCurrentRoute);
+            }
+
+            @Override
+            public void onFailure(Call<DirectionsResponse> call, Throwable t) {
+
+            }
+        });
+    }
+
+    @Override
+    public void fasterRouteFound(DirectionsRoute directionsRoute) {
+        startNavigation(directionsRoute);
+    }
+}
+// TODO : Have to test OffRouteListener and RouteListener when going out

@@ -13,7 +13,9 @@
         android:textColor="@color/textColor"
         android:text="Your Location"
         android:paddingLeft="5dp"
-        android:enabled="false"
+        android:focusableInTouchMode="false"
+        android:id="@+id/origin_location"
+        android:onClick="onClick"
         style="@style/Widget.AppCompat.EditText"
         />
 
@@ -53,6 +55,7 @@
             android:layout_alignParentRight="true"
             android:layout_above="@id/navigation_button"
             android:layout_marginRight="20dp"
+            android:visibility="invisible"
             android:id="@+id/waypoint_button"
             android:background="@drawable/waypoint_button"/>
 
