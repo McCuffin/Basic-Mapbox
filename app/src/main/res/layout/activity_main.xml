@@ -2,6 +2,7 @@
 <LinearLayout android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:mapbox="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical"
     xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -38,7 +39,7 @@
     <!--TODO: Start Navigation Button-->
     <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="match_parent">
 
         <com.mapbox.mapboxsdk.maps.MapView
             android:id="@+id/mapView"
@@ -50,8 +51,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentRight="true"
-            android:layout_marginTop="450dp"
-            android:visibility="invisible"
+            android:layout_above="@id/navigation_button"
             android:layout_marginRight="20dp"
             android:id="@+id/waypoint_button"
             android:background="@drawable/waypoint_button"/>
@@ -60,9 +60,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentRight="true"
-            android:background="@drawable/navigate_button"
-            android:layout_marginTop="520dp"
+            android:layout_alignParentBottom="true"
+            android:layout_marginVertical="16dp"
             android:layout_marginRight="20dp"
+            android:background="@drawable/navigate_button"
             android:id="@+id/navigation_button"
             android:enabled = "false"
             />
