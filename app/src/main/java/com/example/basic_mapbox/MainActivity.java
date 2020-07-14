@@ -99,6 +99,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private EditText searchLocation;
     private EditText originLocation;
+    private String searchLocationText;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -107,10 +108,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         setContentView(R.layout.activity_main);
         mapView = findViewById(R.id.mapView);
         navigationButton = findViewById(R.id.navigation_button);
+        searchLocation = findViewById(R.id.search_location);
+        originLocation = findViewById(R.id.origin_location);
+        searchLocationText = "";
         navigationButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (navigationButton.isEnabled()) {
+                if (!searchLocationText.equals("")) {
                     Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
                     startActivity(intent);
                 }
@@ -130,9 +134,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         });
         waypointButton = findViewById(R.id.waypoint_button);
-        searchLocation = findViewById(R.id.search_location);
-        originLocation = findViewById(R.id.origin_location);
-
 
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(this);
@@ -411,7 +412,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         else if (requestCode == REQUEST_CODE_AUTOCOMPLETE_DESTINATION) {
             destinationLocation = (Point) selectedCarmenFeature.geometry(); //Gives destination Location
 //Changing Edit Text to the destination location name
-            searchLocation.setText(selectedCarmenFeature.placeName().substring(0, selectedCarmenFeature.placeName().indexOf(',')));
+            searchLocationText = selectedCarmenFeature.placeName().substring(0, selectedCarmenFeature.placeName().indexOf(','));
+            searchLocation.setText(searchLocationText);
 
             Feature temp = features.get(hashMapKeyOrigin);
 
