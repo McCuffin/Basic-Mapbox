@@ -367,14 +367,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
-      private void addUserLocations() {
-          currUserLocation = CarmenFeature.builder().text("Your Location")
-                  .geometry(Point.fromLngLat(yourLocation.getLongitude(), yourLocation.getLatitude()))
-                  .placeName("Your Location,")
-                  .id("user-location")
-                  .properties(new JsonObject())
-                  .build();
-     }
+    private void addUserLocations() {
+        currUserLocation = CarmenFeature.builder().text("Your Location")
+                .geometry(Point.fromLngLat(yourLocation.getLongitude(), yourLocation.getLatitude()))
+                .placeName("Your Location,")
+                .id("user-location")
+                .properties(new JsonObject())
+                .build();
+    }
 
 
     private void setUpSource(@NonNull Style loadedMapStyle) {
