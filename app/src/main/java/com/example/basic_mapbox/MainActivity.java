@@ -10,6 +10,7 @@ import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -94,7 +95,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final String hashMapKeyOrigin = "Origin";
     private static final String hashMapKeyDestination = "Destination";
     private CarmenFeature currUserLocation;
-    private Style mapStyle;
     private String geojsonSourceLayerId = "geojsonSourceLayerId";
 
     private EditText searchLocation;
@@ -140,35 +140,31 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void locationEnabled() {
+        //TODO: Have to start the GPS
         LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         boolean gps_enabled = false;
         boolean network_enabled = false;
         try {
             gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
         } catch (Exception e) {
-            Log.d(TAG, "GPS not enabled");
+            e.printStackTrace();
         }
         try {
             network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
         } catch (Exception e) {
-            Log.d(TAG, "Network not enabled");
+            e.printStackTrace();
         }
         if (!gps_enabled && !network_enabled) {
             new AlertDialog.Builder(MainActivity.this)
-                    .setMessage("Please enable the GPS in order to use the features of this app")
-                    .setCancelable(false)
-                    .setTitle("GPS not Enabled")
-                    .setNeutralButton("Go to Settings", new
+                    .setMessage("GPS Enable")
+                    .setPositiveButton("Settings", new
                             DialogInterface.OnClickListener() {
                                 @Override
                                 public void onClick(DialogInterface paramDialogInterface, int paramInt) {
-                                    startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-                                    initSearchLocation();
-                                    addUserLocations();
-                                    setUpSource(mapStyle);
-                                    setupLayer(mapStyle);
+                                    startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
                                 }
                             })
+                    .setNegativeButton("Cancel", null)
                     .show();
         }
     }
@@ -224,7 +220,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     @Override
                     public void onStyleLoaded(@NonNull Style style) {
                         enableLocationComponent(style);
-                        mapStyle = style;
+
+                        initSearchLocation();
+                        addUserLocations();
+                        setUpSource(style);
+                        setupLayer(style);
                     }
                 });
     }
@@ -278,9 +278,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void enableLocationComponent(@NonNull Style loadedMapStyle) {
 // Check if permissions are enabled and if not request
         if (PermissionsManager.areLocationPermissionsGranted(this)) {
+            locationEnabled();
 // Get an instance of the component
             LocationComponent locationComponent = mapboxMap.getLocationComponent();
-
 
 // Activate with options
             locationComponent.activateLocationComponent(
@@ -305,10 +305,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                                 iconIgnorePlacement(true)
                         )
                 );
-                initSearchLocation();
-                addUserLocations();
-                setUpSource(mapStyle);
-                setupLayer(mapStyle);
             } catch (NullPointerException e) {
                 AlertDialog.Builder startGPS = new AlertDialog.Builder(this);
                 startGPS.setTitle("GPS not enabled");
@@ -510,13 +506,22 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public void onExplanationNeeded(List<String> permissionsToExplain) {
-
+        AlertDialog.Builder reasonOfPerms = new AlertDialog.Builder(this);
+        reasonOfPerms.setTitle(getString(R.string.user_location_permission_title));
+        reasonOfPerms.setMessage(getString(R.string.user_location_permission_explanation));
+        reasonOfPerms.setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                //Needed to be left empty since nothing is to be done.
+            }
+        });
+        AlertDialog permsDialog = reasonOfPerms.create();
+        permsDialog.show();
     }
 
     @Override
     public void onPermissionResult(boolean granted) {
         if (granted) {
-            locationEnabled();
             mapboxMap.getStyle(new Style.OnStyleLoaded() {
                 @Override
                 public void onStyleLoaded(@NonNull Style style) {
