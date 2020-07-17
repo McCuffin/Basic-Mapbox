@@ -1,14 +1,19 @@
 package com.example.basic_mapbox;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.util.Log;
@@ -18,11 +23,10 @@ import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.gson.JsonObject;
-import com.mapbox.android.core.permissions.PermissionsListener;
-import com.mapbox.android.core.permissions.PermissionsManager;
 import com.mapbox.api.directions.v5.DirectionsCriteria;
 import com.mapbox.api.directions.v5.models.DirectionsResponse;
 import com.mapbox.api.directions.v5.models.DirectionsRoute;
@@ -51,7 +55,6 @@ import com.mapbox.services.android.navigation.v5.navigation.NavigationRoute;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -62,7 +65,7 @@ import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconIgnorePlacem
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconImage;
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconOffset;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, PermissionsListener {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private MapView mapView;
     private MapboxMap mapboxMap;
@@ -79,8 +82,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static final String TAG = "MainActivity";
     private static final boolean ON_CLICK_CALL_ORIGIN = true;
     private static final boolean ON_CLICK_CALL_DESTINATION = false;
-
-    private PermissionsManager permissionsManager;
 
     private static final String SOURCE_ID = "SOURCE_ID";
     private static final String ICON_ID = "ICON_ID";
@@ -100,7 +101,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private EditText searchLocation;
     private EditText originLocation;
     private String searchLocationText;
+    private boolean gps_enabled;
+    private static final int REQUEST_CODE_LOCATION = 10;
+    private Bundle bundle_copy;
 
+    @RequiresApi(api = Build.VERSION_CODES.M)
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -111,6 +116,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         searchLocation = findViewById(R.id.search_location);
         originLocation = findViewById(R.id.origin_location);
         searchLocationText = "";
+        gps_enabled = false;
+        bundle_copy = savedInstanceState;
         navigationButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -135,37 +142,80 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
         waypointButton = findViewById(R.id.waypoint_button);
 
-        mapView.onCreate(savedInstanceState);
-        mapView.getMapAsync(this);
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                AlertDialog.Builder reasonOfPerms = new AlertDialog.Builder(this);
+                reasonOfPerms.setTitle(getString(R.string.user_location_permission_title));
+                reasonOfPerms.setMessage(getString(R.string.user_location_permission_explanation));
+                reasonOfPerms.setNeutralButton("Ok", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        //Needed to be left empty since nothing is to be done.
+                    }
+                });
+                AlertDialog permsDialog = reasonOfPerms.create();
+                permsDialog.show();
+            }
+
+            requestPermissions(new String[] {Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_CODE_LOCATION);
+        } else {
+            locationEnabled();
+            if (gps_enabled) {
+                mapView.onCreate(savedInstanceState);
+                mapView.getMapAsync(this);
+            }
+        }
     }
 
+    @SuppressLint("MissingPermission")
     private void locationEnabled() {
-        //TODO: Have to start the GPS
         LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        boolean gps_enabled = false;
-        boolean network_enabled = false;
-        try {
-            gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        try {
-            network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        if (!gps_enabled && !network_enabled) {
-            new AlertDialog.Builder(MainActivity.this)
-                    .setMessage("GPS Enable")
-                    .setPositiveButton("Settings", new
-                            DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface paramDialogInterface, int paramInt) {
-                                    startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-                                }
-                            })
-                    .setNegativeButton("Cancel", null)
-                    .show();
+        gps_enabled = false;
+        while (!gps_enabled) {
+            try {
+                gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            if (!gps_enabled) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                builder.setTitle("GPS not Enabled");
+                builder.setMessage("Please enable the GPS for proper functioning of the app");
+                builder.setNeutralButton("Go To Settings", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                    }
+                });
+                builder.setCancelable(false);
+
+                AlertDialog showDialog = builder.create();
+                showDialog.show();
+            } else {
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, new LocationListener() {
+                    @Override
+                    public void onLocationChanged(Location location) {
+                        yourLocation = location;
+                    }
+
+                    @Override
+                    public void onStatusChanged(String s, int i, Bundle bundle) {
+
+                    }
+
+                    @Override
+                    public void onProviderEnabled(String s) {
+
+                    }
+
+                    @Override
+                    public void onProviderDisabled(String s) {
+
+                    }
+                });
+                return;
+            }
         }
     }
 
@@ -217,6 +267,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         MainActivity.this.mapboxMap = mapboxMap;
         mapboxMap.setStyle(new Style.Builder().fromUri("mapbox://styles/mapbox/streets-v11"),
                 new Style.OnStyleLoaded() {
+                    @RequiresApi(api = Build.VERSION_CODES.M)
                     @Override
                     public void onStyleLoaded(@NonNull Style style) {
                         enableLocationComponent(style);
@@ -274,10 +325,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.M)
     @SuppressWarnings({"MissingPermission"})
     private void enableLocationComponent(@NonNull Style loadedMapStyle) {
 // Check if permissions are enabled and if not request
-        if (PermissionsManager.areLocationPermissionsGranted(this)) {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             locationEnabled();
 // Get an instance of the component
             LocationComponent locationComponent = mapboxMap.getLocationComponent();
@@ -323,9 +375,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
 // Set the component's render mode
             locationComponent.setRenderMode(RenderMode.COMPASS);
-        } else {
-            permissionsManager = new PermissionsManager(this);
-            permissionsManager.requestLocationPermissions(this);
         }
     }
 
@@ -501,36 +550,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        permissionsManager.onRequestPermissionsResult(requestCode, permissions, grantResults);
-    }
-
-    @Override
-    public void onExplanationNeeded(List<String> permissionsToExplain) {
-        AlertDialog.Builder reasonOfPerms = new AlertDialog.Builder(this);
-        reasonOfPerms.setTitle(getString(R.string.user_location_permission_title));
-        reasonOfPerms.setMessage(getString(R.string.user_location_permission_explanation));
-        reasonOfPerms.setNeutralButton("Ok", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialogInterface, int i) {
-                //Needed to be left empty since nothing is to be done.
-            }
-        });
-        AlertDialog permsDialog = reasonOfPerms.create();
-        permsDialog.show();
-    }
-
-    @Override
-    public void onPermissionResult(boolean granted) {
-        if (granted) {
-            mapboxMap.getStyle(new Style.OnStyleLoaded() {
-                @Override
-                public void onStyleLoaded(@NonNull Style style) {
-                    enableLocationComponent(style);
+        if (requestCode == REQUEST_CODE_LOCATION) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                locationEnabled();
+                if (gps_enabled) {
+                    mapView.onCreate(bundle_copy);
+                    mapView.getMapAsync(this);
                 }
-            });
+            } else {
+                Toast.makeText(this, "Location Permission was not granted", Toast.LENGTH_SHORT).show();
+            }
         } else {
-            Toast.makeText(this, R.string.user_location_permission_not_granted, Toast.LENGTH_LONG).show();
-            finish();
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         }
     }
 }
