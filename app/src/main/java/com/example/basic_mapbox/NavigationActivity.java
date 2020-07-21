@@ -59,6 +59,7 @@ public class NavigationActivity extends AppCompatActivity implements OnNavigatio
     private View spacer;
     private TextView speedWidget;
     private DirectionsRoute newCurrentRoute;
+    private Transfer transferObj;
 
     private boolean bottomSheetVisible = true;
 
@@ -70,10 +71,11 @@ public class NavigationActivity extends AppCompatActivity implements OnNavigatio
         navigationView = findViewById(R.id.navigationView);
         speedWidget = findViewById(R.id.speed_limit);
         spacer = findViewById(R.id.spacer);
+        transferObj = Transfer.getTransfer();
         setSpeedWidgetAnchor(R.id.summaryBottomSheet);
 
         CameraPosition initialPosition = new CameraPosition.Builder()
-                .target(new LatLng(MainActivity.yourLocation.getLatitude(),MainActivity.yourLocation.getLongitude()))
+                .target(new LatLng(transferObj.getYourLocation().getLatitude(),transferObj.getYourLocation().getLongitude()))
                 .zoom(INITIAL_ZOOM)
                 .build();
         navigationView.onCreate(savedInstanceState);
@@ -82,7 +84,7 @@ public class NavigationActivity extends AppCompatActivity implements OnNavigatio
 
     @Override
     public void onNavigationReady(boolean isRunning) {
-        startNavigation(MainActivity.currentRoute);
+        startNavigation(transferObj.getCurrentRoute());
     }
 
     @Override
@@ -272,8 +274,8 @@ public class NavigationActivity extends AppCompatActivity implements OnNavigatio
 
     @Override
     public void onArrival() {
-        if (!MainActivity.waypoints.isEmpty()) {
-            Point currWaypoint = MainActivity.waypoints.remove(0);
+        if (!transferObj.getWaypoints().isEmpty()) {
+            Point currWaypoint = transferObj.getWaypoints().remove(0);
             Geocoder converter = new Geocoder(this);
             String location = "";
             try {
@@ -296,9 +298,9 @@ public class NavigationActivity extends AppCompatActivity implements OnNavigatio
                 .accessToken(getString(R.string.access_token))
                 .profile(DirectionsCriteria.PROFILE_DRIVING)
                 .origin(Point.fromLngLat(location.getLongitude(), location.getLatitude()))
-                .destination(MainActivity.destinationLocation);
+                .destination(transferObj.getDestinationLocation());
 
-        for(Point p: MainActivity.waypoints) {
+        for(Point p: transferObj.getWaypoints()) {
             routeBuilder.addWaypoint(p);
         }
 

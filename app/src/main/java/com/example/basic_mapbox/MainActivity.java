@@ -70,13 +70,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private MapView mapView;
     private MapboxMap mapboxMap;
 
-    protected static DirectionsRoute currentRoute;
+    private DirectionsRoute currentRoute;
     private NavigationMapRoute navigationMapRoute;
 
-    protected static Location yourLocation;
-    protected static Point destinationLocation;
+    private Location yourLocation;
+    private Point destinationLocation;
     private Point origin;
-    protected static ArrayList<Point> waypoints = new ArrayList<>();
+    private ArrayList<Point> waypoints = new ArrayList<>();
     private ArrayList<Feature> featuresList = new ArrayList<>();
     private HashMap<String, Feature> features = new HashMap<>();
     private static final String TAG = "MainActivity";
@@ -104,6 +104,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private boolean gps_enabled;
     private static final int REQUEST_CODE_LOCATION = 10;
     private Bundle bundle_copy;
+    private Transfer transferObj;
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,36 +112,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_main);
-        mapView = findViewById(R.id.mapView);
-        navigationButton = findViewById(R.id.navigation_button);
-        searchLocation = findViewById(R.id.search_location);
-        originLocation = findViewById(R.id.origin_location);
-        searchLocationText = "";
-        gps_enabled = false;
         bundle_copy = savedInstanceState;
-        navigationButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (!searchLocationText.equals("")) {
-                    Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
-                    startActivity(intent);
-                }
-                else {
-                    AlertDialog.Builder setDestination = new AlertDialog.Builder(MainActivity.this);
-                    setDestination.setTitle("Destination Not Provided");
-                    setDestination.setMessage("Please provide a destination in order to navigate");
-                    setDestination.setNeutralButton("OK", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialogInterface, int i) {
-                            //Intentionally left empty since nothing is to be done.
-                        }
-                    });
-                    AlertDialog setDestinationDialog = setDestination.create();
-                    setDestinationDialog.show();
-                }
-            }
-        });
-        waypointButton = findViewById(R.id.waypoint_button);
+        initializations();
 
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
@@ -160,22 +133,57 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             requestPermissions(new String[] {Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_CODE_LOCATION);
         } else {
             locationEnabled();
-            if (gps_enabled) {
-                mapView.onCreate(savedInstanceState);
-                mapView.getMapAsync(this);
-            }
         }
     }
 
+    private void initializations() {
+        mapView = findViewById(R.id.mapView);
+        navigationButton = findViewById(R.id.navigation_button);
+        searchLocation = findViewById(R.id.search_location);
+        originLocation = findViewById(R.id.origin_location);
+        searchLocationText = "";
+        gps_enabled = false;
+        waypointButton = findViewById(R.id.waypoint_button);
+        // On Click Listener for Navigation Button
+        navigationButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (!searchLocationText.equals("")) {
+                    transferObj = new Transfer();
+                    transferObj.setCurrentRoute(currentRoute);
+                    transferObj.setDestinationLocation(destinationLocation);
+                    transferObj.setWaypoints(waypoints);
+                    transferObj.setYourLocation(yourLocation);
+                    Transfer.setTransfer(transferObj);
+                    Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
+                    startActivity(intent);
+                }
+                else {
+                    AlertDialog.Builder setDestination = new AlertDialog.Builder(MainActivity.this);
+                    setDestination.setTitle("Destination Not Provided");
+                    setDestination.setMessage("Please provide a destination in order to navigate");
+                    setDestination.setNeutralButton("OK", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            //Intentionally left empty since nothing is to be done.
+                        }
+                    });
+                    AlertDialog setDestinationDialog = setDestination.create();
+                    setDestinationDialog.show();
+                }
+            }
+        });
+    }
+
+
     @SuppressLint("MissingPermission")
     private void locationEnabled() {
+        //TODO : GPS Settings shown earlier but map not getting loaded (Program Not going further ahead)
         LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        gps_enabled = false;
-        while (!gps_enabled) {
             try {
                 gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.d(TAG, "Location Error");
             }
 
             if (!gps_enabled) {
@@ -186,37 +194,44 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     @Override
                     public void onClick(DialogInterface dialogInterface, int i) {
                         startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                        gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+                        if (gps_enabled) {
+                            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, new LocationListener() {
+                                @Override
+                                public void onLocationChanged(Location location) {
+                                    yourLocation = location;
+                                }
+
+                                @Override
+                                public void onStatusChanged(String s, int i, Bundle bundle) {
+
+                                }
+
+                                @Override
+                                public void onProviderEnabled(String s) {
+
+                                }
+
+                                @Override
+                                public void onProviderDisabled(String s) {
+
+                                }
+                            });
+                            mapView.onCreate(bundle_copy);
+                            mapView.getMapAsync(MainActivity.this);
+                        }
                     }
                 });
                 builder.setCancelable(false);
 
+
                 AlertDialog showDialog = builder.create();
                 showDialog.show();
             } else {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, new LocationListener() {
-                    @Override
-                    public void onLocationChanged(Location location) {
-                        yourLocation = location;
-                    }
-
-                    @Override
-                    public void onStatusChanged(String s, int i, Bundle bundle) {
-
-                    }
-
-                    @Override
-                    public void onProviderEnabled(String s) {
-
-                    }
-
-                    @Override
-                    public void onProviderDisabled(String s) {
-
-                    }
-                });
-                return;
+                mapView.onCreate(bundle_copy);
+                mapView.getMapAsync(MainActivity.this);
             }
-        }
+
     }
 
     @Override
@@ -553,10 +568,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (requestCode == REQUEST_CODE_LOCATION) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 locationEnabled();
-                if (gps_enabled) {
-                    mapView.onCreate(bundle_copy);
-                    mapView.getMapAsync(this);
-                }
             } else {
                 Toast.makeText(this, "Location Permission was not granted", Toast.LENGTH_SHORT).show();
             }
